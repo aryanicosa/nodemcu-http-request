@@ -6,8 +6,8 @@
 #include <ESP8266WiFi.h>
 #include <WiFiClientSecure.h>
 
-const char* ssid = "your_wifi_ssid";
-const char* password = "your_wifi_ssid_password";
+const char* ssid = "Redmi1";
+const char* password = "aryanicosa";
 
 const char* host = "postman-echo.com";
 const char fingerprint[] = "99 c3 89 d6 54 04 82 a3 fd e2 ff 8e 9d c0 78 73 08 30 f0 68"; // web fingerprint. This is for postman-echo.com, check yours here https://iplocation.io/ssl-certificate-fingerprint
@@ -59,10 +59,21 @@ void loop() {
     Serial.print("[HTTP request] begin...\n");
 
     String httpsUrl = "https://postman-echo.com";
-    apiRequest(POST_VERB, httpsUrl + "/post", "data to post", "", "");
-    apiRequest(GET_VERB, httpsUrl + "/basic-auth", "", "basic", "postman:password");
-    apiRequest(PUT_VERB, httpsUrl + "/put", "data to put", "", "");
-    apiRequest(PATCH_VERB, httpsUrl + "/patch", "data to patch", "", "");
+    String postReq = apiRequest(POST_VERB, httpsUrl + "/post", "data to post", "", "");
+    /* use string value from postReq for your needs*/
+    Serial.println(postReq);
+
+    String getReq = apiRequest(GET_VERB, httpsUrl + "/basic-auth", "", "basic", "postman:password");
+    /* use string value from getReq for your needs*/
+    Serial.println(getReq);
+
+    String putReq = apiRequest(PUT_VERB, httpsUrl + "/put", "data to put", "", "");
+    /* use string value from putReq for your needs*/
+    Serial.println(putReq);
+
+    String patchReq = apiRequest(PATCH_VERB, httpsUrl + "/patch", "data to patch", "", "");
+    /* use string value from patchReq for your needs*/
+    Serial.println(patchReq);
   } else {
     wifiRestart();
   }
@@ -70,7 +81,7 @@ void loop() {
   delay(30000);
 }
 
-void apiRequest(Verb verb, String url, String data, String authType, String authParam) {
+String apiRequest(Verb verb, String url, String data, String authType, String authParam) {
   http.begin(httpsClient, url);
 
   if (authType == "basic") {
@@ -110,8 +121,7 @@ void apiRequest(Verb verb, String url, String data, String authType, String auth
     Serial.println("Connected to web");
   }
 
-  int httpCode;
-
+  int httpCode = 0;
   switch (verb) {
     case POST_VERB:
       httpCode = http.POST(data);
@@ -129,6 +139,7 @@ void apiRequest(Verb verb, String url, String data, String authType, String auth
       break;
   }
 
+  const char* responseDataField;
   if (httpCode > 0) {
     // HTTP header has been send and Server response header has been handled
     Serial.printf("[HTTP] ... code: %d\n", httpCode);
@@ -136,7 +147,7 @@ void apiRequest(Verb verb, String url, String data, String authType, String auth
     // file found at server
     if (httpCode >= 200 and httpCode <= 299) {
       String jsonStringPayload = http.getString();
-      Serial.println("complete payload: " + jsonStringPayload);
+      //Serial.println("complete payload: " + jsonStringPayload); // debugging only
 
       const size_t docSize
         = JSON_OBJECT_SIZE(2) + JSON_OBJECT_SIZE(3) + JSON_OBJECT_SIZE(5) + JSON_OBJECT_SIZE(8) + 370;
@@ -146,24 +157,26 @@ void apiRequest(Verb verb, String url, String data, String authType, String auth
 
       // Test if parsing succeeds.
       if (error) {
-        Serial.print(F("deserializeJson() failed: "));
+        Serial.print(F("while parsing json, make sure your API contract use json. deserializeJson() failed: "));
         Serial.println(error.f_str());
-        return;
+        http.end();
+        return "error";
       }
 
-      const char* responseDataField;
       if (verb == GET_VERB) {
         int data = doc["authenticated"];
         responseDataField = data ? "true" : "false";
       } else {
         responseDataField = doc["data"];
       }
-      Serial.printf("data: %s\n", responseDataField);
+      //Serial.printf("data: %s\n", responseDataField); // debugging only
     }
   } else {
     Serial.printf("[HTTP] ... failed, error: %s\n", http.errorToString(httpCode).c_str());
+    http.end();
+    return "error";
   }
 
   http.end();
-  delay(1000);
+  return responseDataField;
 }
